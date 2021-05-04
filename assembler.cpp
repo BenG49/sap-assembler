@@ -1,29 +1,4 @@
-#include <algorithm>
-#include <exception>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <math.h>
-#include <array>
-#include <regex>
-#include <map>
-
-using namespace std;
-
-const uint8_t NOP = 0;
-const uint8_t LDA = 1;
-const uint8_t STA = 3;
-const uint8_t ADD = 5;
-const uint8_t SUB = 7;
-const uint8_t OUT = 9;
-const uint8_t JMP = 10;
-const uint8_t HLT = 12;
-
-const string numerr("Invalid number (>0xff) given");
-const string typeerr("Invalid type (pointer given for memory address");
-const string labelerr("Duplicate label");
-const string iderr("Invalid identifier");
+#include "lib.hpp"
 
 enum Type
 {
@@ -62,11 +37,6 @@ struct Token
     int col;
 };
 
-void error(string out, int line, int col)
-{
-    cout << out << " at line " << line << ", column " << col << endl;
-    throw -1;
-}
 void error(string out, Token t)
 {
     error(out, t.line, t.col);
@@ -229,7 +199,7 @@ void write(string outfile, vector<Token> *tokens)
                     parseSingleArg(ADD, &i, tokens, &file);
                 else if (current.val == "sub")
                     parseSingleArg(SUB, &i, tokens, &file);
-                else if (current.val == "jmp")
+                else if (current.val == "jmp" || current.val == "jz" || current.val == "jc")
                 {
                     // jump to label
                     if ((*tokens)[i+1].type == INSTR)
@@ -237,7 +207,13 @@ void write(string outfile, vector<Token> *tokens)
                         ++i;
                         int val = labels[(*tokens)[i].val];
 
-                        writeToFile(JMP, &file, false);
+                        if (current.val == "jmp")
+                            writeToFile(JMP, &file, false);
+                        else if (current.val == "jz")
+                            writeToFile(JZ, &file, false);
+                        else if (current.val == "jc")
+                            writeToFile(JC, &file, false);
+
                         writeToFile(val, &file, true);
                     } else
                         parseSingleArg(JMP, &i, tokens, &file);
