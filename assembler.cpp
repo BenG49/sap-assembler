@@ -91,13 +91,13 @@ std::vector<Token> parseTokens(std::string filename)
     return output;
 }
 
-void writeToFile(int val, std::ofstream *file, bool eol)
+void writeToFile(int val, std::ofstream& file, bool eol)
 {
-    (*file) << "0x" << std::hex << val;
+    file << "0x" << std::hex << val;
     if (eol)
-        (*file) << std::endl;
+        file << std::endl;
     else
-        (*file) << ' ';
+        file << ' ';
 }
 
 uint8_t parseVal(Token in)
@@ -128,12 +128,12 @@ uint8_t parseVal(Token in)
     return out;
 }
 
-void parseSingleArg(int instrId, int *i, std::vector<Token> *tokens, std::ofstream *file)
+void parseSingleArg(int instrId, int& i, std::vector<Token> tokens, std::ofstream& file)
 {
     // advance token to arg
-    ++(*i);
+    ++i;
     // token right after instruction
-    Token arg = (*tokens)[*i];
+    Token arg = tokens[i];
     int val;
 
     // if numeric
@@ -148,8 +148,8 @@ void parseSingleArg(int instrId, int *i, std::vector<Token> *tokens, std::ofstre
     else if (arg.type == LBRAC)
     {
         // get value, advance past brackets
-        arg = (*tokens)[*i+1];
-        *i += 2;
+        arg = tokens[i+1];
+        i += 2;
 
         val = parseVal(arg);
 
@@ -161,7 +161,7 @@ void parseSingleArg(int instrId, int *i, std::vector<Token> *tokens, std::ofstre
     writeToFile(val, file, true);
 }
 
-void write(std::string outfile, std::vector<Token> *tokens)
+void write(std::string outfile, std::vector<Token> tokens)
 {
     std::ofstream file(outfile);
 
@@ -170,53 +170,53 @@ void write(std::string outfile, std::vector<Token> *tokens)
     int bytes = 0;
 
     // loop through tokens
-    for (int i = 0; i < tokens->size(); ++i)
+    for (int i = 0; i < tokens.size(); ++i)
     {
-        Token current = (*tokens)[i];
+        Token current = tokens[i];
 
         if (current.type == INSTR)
         {
             if (current.val == "nop")
-                writeToFile(NOP, &file, true);
+                writeToFile(NOP, file, true);
             else if (current.val == "out")
-                writeToFile(OUT, &file, true);
+                writeToFile(OUT, file, true);
             else if (current.val == "hlt")
-                writeToFile(HLT, &file, true);
+                writeToFile(HLT, file, true);
 
             else // instructions with arguments
             {
                 if (current.val == "lda")
-                    parseSingleArg(LDA, &i, tokens, &file);
+                    parseSingleArg(LDA, i, tokens, file);
                 else if (current.val == "sta")
                 {
-                    Token arg = (*tokens)[i+1];
+                    Token arg = tokens[i+1];
                     if (arg.type == LBRAC)
                         error(typeerr, arg);
 
-                    parseSingleArg(STA, &i, tokens, &file);
+                    parseSingleArg(STA, i, tokens, file);
                 }
                 else if (current.val == "add")
-                    parseSingleArg(ADD, &i, tokens, &file);
+                    parseSingleArg(ADD, i, tokens, file);
                 else if (current.val == "sub")
-                    parseSingleArg(SUB, &i, tokens, &file);
+                    parseSingleArg(SUB, i, tokens, file);
                 else if (current.val == "jmp" || current.val == "jz" || current.val == "jc")
                 {
                     // jump to label
-                    if ((*tokens)[i+1].type == INSTR)
+                    if (tokens[i+1].type == INSTR)
                     {
                         ++i;
-                        int val = labels[(*tokens)[i].val];
+                        int val = labels[tokens[i].val];
 
                         if (current.val == "jmp")
-                            writeToFile(JMP, &file, false);
+                            writeToFile(JMP, file, false);
                         else if (current.val == "jz")
-                            writeToFile(JZ, &file, false);
+                            writeToFile(JZ, file, false);
                         else if (current.val == "jc")
-                            writeToFile(JC, &file, false);
+                            writeToFile(JC, file, false);
 
-                        writeToFile(val, &file, true);
+                        writeToFile(val, file, true);
                     } else
-                        parseSingleArg(JMP, &i, tokens, &file);
+                        parseSingleArg(JMP, i, tokens, file);
                 }
 
                 ++bytes;
@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
     {
         std::vector<Token> i = parseTokens(argv[1]);
 
-        write("out.txt", &i);
+        write("out.txt", i);
     }
     else
         std::cout << "Must give a file argument!" << std::endl;
