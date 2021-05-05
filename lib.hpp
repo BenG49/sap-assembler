@@ -7,8 +7,6 @@
 #include <regex>
 #include <map>
 
-using namespace std;
-
 const uint8_t NOP = 0;
 const uint8_t LDA = 1;
 const uint8_t STA = 3;
@@ -20,14 +18,14 @@ const uint8_t JC = 12;
 const uint8_t JZ = 14;
 const uint8_t HLT = 16;
 
-const string numerr("Invalid number (>0xff) given");
-const string typeerr("Invalid type (pointer given for memory address");
-const string labelerr("Duplicate label");
-const string iderr("Invalid identifier");
+const std::string numerr("Invalid number (>0xff) given");
+const std::string typeerr("Invalid type (pointer given for memory address");
+const std::string labelerr("Duplicate label");
+const std::string iderr("Invalid identifier");
 
 
-void error(string out, int line, int col)
+void error(std::string out, int line, int col)
 {
-    cout << out << " at line " << line << ", column " << col << endl;
+    std::cout << out << " at line " << line << ", column " << col << std::endl;
     throw -1;
 }

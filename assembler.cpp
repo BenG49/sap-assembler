@@ -16,39 +16,39 @@ enum Type
 
 // https://medium.com/factory-mind/regex-tutorial-a-simple-cheatsheet-by-examples-649dc1c3f285
 // https://www.modula2.org/sb/env/index583.htm
-const array<regex, TYPE_COUNT> regexes({
-    regex("^([A-z]+[A-z\\d]*):\\s*"),
-    regex("^0[xX]([a-fA-F\\d]+)\\s*"),
-    regex("^0[bB]([01]+)\\s*"),
-    regex("^(\\d+)\\s*"),
-    regex("^\\[\\s*"),
-    regex("^\\]\\s*"),
-    regex("^\\s*([A-z]+)\\s*"),
-    regex("^\\s*(\r\n|\r|\n)"),
-    regex("^\\s*;.*")
+const std::array<std::regex, TYPE_COUNT> regexes({
+    std::regex("^([A-z]+[A-z\\d]*):\\s*"),
+    std::regex("^0[xX]([a-fA-F\\d]+)\\s*"),
+    std::regex("^0[bB]([01]+)\\s*"),
+    std::regex("^(\\d+)\\s*"),
+    std::regex("^\\[\\s*"),
+    std::regex("^\\]\\s*"),
+    std::regex("^\\s*([A-z]+)\\s*"),
+    std::regex("^\\s*(\r\n|\r|\n)"),
+    std::regex("^\\s*;.*")
 });
 
 struct Token
 {
     int type;
-    string val;
+    std::string val;
 
     int line;
     int col;
 };
 
-void error(string out, Token t)
+void error(std::string out, Token t)
 {
     error(out, t.line, t.col);
 }
 
-vector<Token> parseTokens(string filename)
+std::vector<Token> parseTokens(std::string filename)
 {
-    ifstream file(filename);
-    vector<Token> output;
+    std::ifstream file(filename);
+    std::vector<Token> output;
 
-    string line;
-    smatch sm;
+    std::string line;
+    std::smatch sm;
 
     int lineNum = 1;
     int col = 1;
@@ -69,9 +69,9 @@ vector<Token> parseTokens(string filename)
                             output.push_back({ i, "", lineNum, col });
                         else
                         {
-                            string m = sm.str(1);
+                            std::string m = sm.str(1);
                             // convert string to lowercase
-                            transform(m.begin(), m.end(), m.begin(), ::tolower);
+                            std::transform(m.begin(), m.end(), m.begin(), ::tolower);
                             output.push_back({ i, m, lineNum, col });
                         }
                     }
@@ -91,11 +91,11 @@ vector<Token> parseTokens(string filename)
     return output;
 }
 
-void writeToFile(int val, ofstream *file, bool eol)
+void writeToFile(int val, std::ofstream *file, bool eol)
 {
-    (*file) << "0x" << hex << val;
+    (*file) << "0x" << std::hex << val;
     if (eol)
-        (*file) << endl;
+        (*file) << std::endl;
     else
         (*file) << ' ';
 }
@@ -105,9 +105,9 @@ uint8_t parseVal(Token in)
     int out;
     if (in.type == HEX_VAL)
     {
-        stringstream ss;
+        std::stringstream ss;
         ss << in.val;
-        ss >> hex >> out;
+        ss >> std::hex >> out;
     }
     else if (in.type == BIN_VAL)
     {
@@ -128,7 +128,7 @@ uint8_t parseVal(Token in)
     return out;
 }
 
-void parseSingleArg(int instrId, int *i, vector<Token> *tokens, ofstream *file)
+void parseSingleArg(int instrId, int *i, std::vector<Token> *tokens, std::ofstream *file)
 {
     // advance token to arg
     ++(*i);
@@ -161,12 +161,12 @@ void parseSingleArg(int instrId, int *i, vector<Token> *tokens, ofstream *file)
     writeToFile(val, file, true);
 }
 
-void write(string outfile, vector<Token> *tokens)
+void write(std::string outfile, std::vector<Token> *tokens)
 {
-    ofstream file(outfile);
+    std::ofstream file(outfile);
 
     // lookup table of the byte location of labels
-    map<string, int> labels;
+    std::map<std::string, int> labels;
     int bytes = 0;
 
     // loop through tokens
@@ -230,7 +230,7 @@ void write(string outfile, vector<Token> *tokens)
             if (labels.find(current.val) != labels.end())
                 error(labelerr, current);
 
-            labels.insert(pair<string, int>(current.val, bytes));
+            labels.insert(std::pair<std::string, int>(current.val, bytes));
         }
     }
 
@@ -241,12 +241,12 @@ int main(int argc, char *argv[])
 {
     if (argc > 1)
     {
-        vector<Token> i = parseTokens(argv[1]);
+        std::vector<Token> i = parseTokens(argv[1]);
 
         write("out.txt", &i);
     }
     else
-        cout << "Must give a file argument!" << endl;
+        std::cout << "Must give a file argument!" << std::endl;
 
     return 0;
 }
