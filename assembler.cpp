@@ -28,6 +28,8 @@ const std::array<std::regex, TYPE_COUNT> regexes({
     std::regex("^\\s*;.*")
 });
 
+std::map<std::string, int> labels;
+
 struct Token
 {
     int type;
@@ -52,7 +54,7 @@ std::vector<Token> parseTokens(std::string filename)
 
     int lineNum = 1;
     int col = 1;
-    while (getline(file, line))
+    while (file >> line)
     {
         // loop through all regexes
         while (line.size() > 0)
@@ -169,7 +171,6 @@ void write(std::string outfile, std::vector<Token> tokens)
     std::ofstream file(outfile);
 
     // lookup table of the byte location of labels
-    std::map<std::string, int> labels;
     int bytes = 0;
 
     // loop through tokens
@@ -208,10 +209,10 @@ void write(std::string outfile, std::vector<Token> tokens)
                 else if (current.val == "jmp" || current.val == "jz" || current.val == "jc")
                 {
                     // jump to label
-                    if (tokens[i+1].type == INSTR)
+                    Token arg = tokens[i+1];
+                    if (arg.type == INSTR)
                     {
                         ++i;
-                        int val = labels[tokens[i].val];
 
                         if (current.val == "jmp")
                             writeToFile(JMP+1, file, false);
@@ -220,7 +221,13 @@ void write(std::string outfile, std::vector<Token> tokens)
                         else if (current.val == "jc")
                             writeToFile(JC, file, false);
 
-                        writeToFile(val, file, true);
+                        if (labels.find(arg.val) == labels.end())
+                            file << arg.val << std::endl;
+                        else
+                        {
+                            int val = labels[arg.val];
+                            writeToFile(val, file, true);
+                        }
                     } else
                         parseSingleArg(JMP, i, tokens, file);
                 }
@@ -243,13 +250,38 @@ void write(std::string outfile, std::vector<Token> tokens)
     file.close();
 }
 
+// extremely efficient, I assure you
+void replaceLabels(std::string filename)
+{
+    std::ifstream in(filename);
+    std::ofstream out("out.txt");
+    std::string line;
+
+    while (in >> line)
+    {
+        // line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+        if (labels.find(line) != labels.end())
+        {
+            out << labels[line] << std::endl;
+        }
+        else
+            out << line << std::endl;
+    }
+
+    in.close();
+    out.close();
+
+    remove(filename.c_str());
+}
+
 int main(int argc, char *argv[])
 {
     if (argc > 1)
     {
         std::vector<Token> i = parseTokens(argv[1]);
 
-        write("out.txt", i);
+        write("temp.txt", i);
+        replaceLabels("temp.txt");
     }
     else
         std::cout << "Must give a file argument!" << std::endl;
