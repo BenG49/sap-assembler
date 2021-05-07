@@ -93,11 +93,14 @@ std::vector<Token> parseTokens(std::string filename)
 
 void writeToFile(int val, std::ofstream& file, bool eol)
 {
+    /*
     file << "0x" << std::hex << val;
     if (eol)
         file << std::endl;
     else
         file << ' ';
+    */
+   file << val << std::endl;
 }
 
 uint8_t parseVal(Token in)
@@ -208,7 +211,7 @@ void write(std::string outfile, std::vector<Token> tokens)
                         int val = labels[tokens[i].val];
 
                         if (current.val == "jmp")
-                            writeToFile(JMP, file, false);
+                            writeToFile(JMP+1, file, false);
                         else if (current.val == "jz")
                             writeToFile(JZ, file, false);
                         else if (current.val == "jc")
