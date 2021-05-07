@@ -196,7 +196,10 @@ void write(std::string outfile, std::vector<Token> tokens)
                     if (arg.type == LBRAC)
                         error(typeerr, arg);
 
-                    parseSingleArg(STA, i, tokens, file);
+                    int val = parseVal(arg);
+
+                    writeToFile(STA, file, false);
+                    writeToFile(val, file, true);
                 }
                 else if (current.val == "add")
                     parseSingleArg(ADD, i, tokens, file);
