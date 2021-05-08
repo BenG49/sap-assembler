@@ -2,14 +2,13 @@
 
 enum Type
 {
+    WHITESPACE,
+    COMMENT,
+
     LABEL,
     HEX_VAL, BIN_VAL, DEC_VAL,
     LBRAC, RBRAC,
     INSTR,
-
-    IGNORED_TYPES,
-    ENDL,
-    COMMENT,
 
     TYPE_COUNT
 };
@@ -17,15 +16,29 @@ enum Type
 // https://medium.com/factory-mind/regex-tutorial-a-simple-cheatsheet-by-examples-649dc1c3f285
 // https://www.modula2.org/sb/env/index583.htm
 const std::array<std::regex, TYPE_COUNT> regexes({
-    std::regex("^([A-z]+[A-z\\d]*):\\s*"),
-    std::regex("^0[xX]([a-fA-F\\d]+)\\s*"),
-    std::regex("^0[bB]([01]+)\\s*"),
-    std::regex("^(\\d+)\\s*"),
-    std::regex("^\\[\\s*"),
-    std::regex("^\\]\\s*"),
-    std::regex("^\\s*([A-z]+)\\s*"),
-    std::regex("^\\s*(\r\n|\r|\n)"),
-    std::regex("^\\s*;.*")
+    std::regex("^\\s+"),
+    std::regex("^;.*"),
+    std::regex("^([A-z]+[A-z\\d]*):"),
+    std::regex("^0[xX]([a-fA-F\\d]+)"),
+    std::regex("^0[bB]([01]+)"),
+    std::regex("^(\\d+)"),
+    std::regex("^\\["),
+    std::regex("^\\]"),
+    std::regex("^([A-z]+)"),
+});
+
+const std::map<std::string, std::pair<int, int>> opcodes({
+    // name, immediate opcode, pointer opcode
+    {"nop", { NOP, 0 }},
+    {"lda", { LDA+1, LDA }},
+    {"sta", { STA, 0 }},
+    {"add", { ADD+1, ADD }},
+    {"sub", { SUB+1, SUB }},
+    {"out", { OUT, 0 }},
+    {"jmp", { JMP+1, JMP }},
+    {"jc",  { JC+1, JC }},
+    {"jz",  { JZ+1, JZ }},
+    {"hlt", { HLT, 0 }},
 });
 
 std::map<std::string, int> labels;
@@ -54,17 +67,18 @@ std::vector<Token> parseTokens(std::string filename)
 
     int lineNum = 1;
     int col = 1;
-    while (file >> line)
+    while (std::getline(file, line))
     {
-        // loop through all regexes
         while (line.size() > 0)
         {
+            // loop through all regexes
             for (int i = 0; i < regexes.size(); ++i)
             {
                 // if match, set match var
-                if (regex_search(line, sm, regexes[i]))
+                if (std::regex_search(line, sm, regexes[i]))
                 {
-                    if (i < IGNORED_TYPES)
+                    // if token matters
+                    if (i > COMMENT)
                     {
                         // doesn't have a capture group/value
                         if (sm.size() == 1)
@@ -91,18 +105,6 @@ std::vector<Token> parseTokens(std::string filename)
 
     file.close();
     return output;
-}
-
-void writeToFile(int val, std::ofstream& file, bool eol)
-{
-    /*
-    file << "0x" << std::hex << val;
-    if (eol)
-        file << std::endl;
-    else
-        file << ' ';
-    */
-   file << val << std::endl;
 }
 
 uint8_t parseVal(Token in)
@@ -133,45 +135,48 @@ uint8_t parseVal(Token in)
     return out;
 }
 
-void parseSingleArg(int instrId, int& i, std::vector<Token> tokens, std::ofstream& file)
+// returns number of extra tokens to advance
+int parseSingleArg(int valueId, int pointerId, int i, std::vector<Token> tokens, std::vector<std::string>& file)
 {
-    // advance token to arg
-    ++i;
     // token right after instruction
-    Token arg = tokens[i];
-    int val;
+    Token arg = tokens[i+1];
 
     // if numeric
     if (arg.type >= HEX_VAL && arg.type <= DEC_VAL)
     {
-        val = parseVal(arg);
+        int val = parseVal(arg);
 
         // write instruction
-        writeToFile(instrId+1, file, false);
+        file.push_back(std::to_string(valueId));
+        // write value byte
+        file.push_back(std::to_string(val));
+
+        return 1;
     }
     // pointer to value in RAM
     else if (arg.type == LBRAC)
     {
         // get value, advance past brackets
-        arg = tokens[i+1];
-        i += 2;
+        arg = tokens[i+2];
 
-        val = parseVal(arg);
+        int val = parseVal(arg);
 
         // write instruction
-        writeToFile(instrId, file, false);
+        file.push_back(std::to_string(pointerId));
+        // write value byte
+        file.push_back(std::to_string(val));
+
+        return 3;
     }
 
-    // write value byte
-    writeToFile(val, file, true);
+    return 0;
 }
 
-void write(std::string outfile, std::vector<Token> tokens)
+std::vector<std::string> write(std::vector<Token> tokens)
 {
-    std::ofstream file(outfile);
-
     // lookup table of the byte location of labels
     int bytes = 0;
+    std::vector<std::string> out;
 
     // loop through tokens
     for (int i = 0; i < tokens.size(); ++i)
@@ -180,61 +185,47 @@ void write(std::string outfile, std::vector<Token> tokens)
 
         if (current.type == INSTR)
         {
-            if (current.val == "nop")
-                writeToFile(NOP, file, true);
-            else if (current.val == "out")
-                writeToFile(OUT, file, true);
-            else if (current.val == "hlt")
-                writeToFile(HLT, file, true);
-
+            if (current.val == "nop" || current.val == "out" || current.val == "hlt")
+                out.push_back(std::to_string(opcodes.at(current.val).first));
             else // instructions with arguments
             {
-                if (current.val == "lda")
-                    parseSingleArg(LDA, i, tokens, file);
-                else if (current.val == "sta")
-                {
-                    Token arg = tokens[i+1];
-                    if (arg.type == LBRAC)
-                        error(typeerr, arg);
-
-                    int val = parseVal(arg);
-
-                    writeToFile(STA, file, false);
-                    writeToFile(val, file, true);
-                }
-                else if (current.val == "add")
-                    parseSingleArg(ADD, i, tokens, file);
-                else if (current.val == "sub")
-                    parseSingleArg(SUB, i, tokens, file);
-                else if (current.val == "jmp" || current.val == "jz" || current.val == "jc")
+                if (current.val == "jmp" || current.val == "jc" || current.val == "jz")
                 {
                     // jump to label
                     Token arg = tokens[i+1];
+                    std::pair<int, int> pair = opcodes.at(current.val);
                     if (arg.type == INSTR)
                     {
-                        ++i;
+                        out.push_back(std::to_string(pair.first));
 
-                        if (current.val == "jmp")
-                            writeToFile(JMP+1, file, false);
-                        else if (current.val == "jz")
-                            writeToFile(JZ, file, false);
-                        else if (current.val == "jc")
-                            writeToFile(JC, file, false);
-
+                        // if referencing a non-indexed label, just put the label name for later
                         if (labels.find(arg.val) == labels.end())
-                            file << arg.val << std::endl;
+                            out.push_back(arg.val);
                         else
                         {
                             int val = labels[arg.val];
-                            writeToFile(val, file, true);
+                            out.push_back(std::to_string(val));
                         }
-                    } else
-                        parseSingleArg(JMP, i, tokens, file);
+
+                        // advance past label jumping to
+                        ++i;
+                    }
+                    // jump to value (can be pointer)
+                    else
+                        i += parseSingleArg(pair.first, pair.second, i, tokens, out);
+                }
+                else
+                {
+                    if (tokens[i+1].type == LBRAC && current.val == "sta")
+                        error(typeerr, tokens[i+1]);
+
+                    std::pair<int, int> pair = opcodes.at(current.val);
+                    i += parseSingleArg(pair.first, pair.second, i, tokens, out);
                 }
 
                 ++bytes;
             }
-            
+
             ++bytes;
         }
         // add label to the lookup table (if label doesn't already exist)
@@ -243,46 +234,38 @@ void write(std::string outfile, std::vector<Token> tokens)
             if (labels.find(current.val) != labels.end())
                 error(labelerr, current);
 
-            labels.insert(std::pair<std::string, int>(current.val, bytes));
+            labels.insert({ current.val, i });
+        }
+    }
+
+    return out;
+}
+
+void replaceLabels(std::vector<std::string> lines)
+{
+    std::ofstream file("out.txt");
+
+    for (std::string line : lines)
+    {
+        try {
+            stoi(line);
+            file << line << std::endl;
+        // if not a number, insert label location
+        } catch (std::invalid_argument)
+        {
+            if (labels.find(line) == labels.end())
+                error("Nonexistent label referenced!", -1, -1);
+            file << labels[line] << std::endl;
         }
     }
 
     file.close();
 }
 
-// extremely efficient, I assure you
-void replaceLabels(std::string filename)
-{
-    std::ifstream in(filename);
-    std::ofstream out("out.txt");
-    std::string line;
-
-    while (in >> line)
-    {
-        // line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-        if (labels.find(line) != labels.end())
-        {
-            out << labels[line] << std::endl;
-        }
-        else
-            out << line << std::endl;
-    }
-
-    in.close();
-    out.close();
-
-    remove(filename.c_str());
-}
-
 int main(int argc, char *argv[])
 {
     if (argc > 1)
-    {
-        std::vector<Token> i = parseTokens(argv[1]);
-
-        write("temp.txt", i);
-        replaceLabels("temp.txt");
-    }
+        replaceLabels(write(parseTokens(argv[1])));
     else
         std::cout << "Must give a file argument!" << std::endl;
 
